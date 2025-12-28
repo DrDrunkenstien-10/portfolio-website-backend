@@ -1,6 +1,6 @@
 # Portfolio Website Backend
 
-A backend service for a personal portfolio website built with modern web technologies.
+Backend codebase for portfolio website.
 
 ## Features
 
