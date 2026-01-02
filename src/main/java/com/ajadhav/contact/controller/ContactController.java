@@ -1,5 +1,7 @@
 package com.ajadhav.contact.controller;
 
+import java.time.LocalDateTime;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -28,9 +30,9 @@ public class ContactController {
     @PostMapping
     public ResponseEntity<ContactResponseDTO> sendEmail(@Valid @RequestBody ContactRequestDTO request) {
         log.info("Received contact request from '{}'", request.getEmail());
-        ContactResponseDTO response = emailService.sendEmail(request);
+        emailService.sendEmail(request);
 
-        log.info("Successfully processed contact request for '{}'", request.getEmail());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new ContactResponseDTO("Message received successfully.",
+                LocalDateTime.now()));
     }
 }

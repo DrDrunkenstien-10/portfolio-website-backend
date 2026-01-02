@@ -1,11 +1,10 @@
 package com.ajadhav.contact.service.email;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.ajadhav.contact.dto.ContactRequestDTO;
-import com.ajadhav.contact.dto.ContactResponseDTO;
-import com.ajadhav.contact.exceptions.EmailSendException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,41 +28,59 @@ class EmailServiceImplTest {
         emailService.setSender("test@example.com");
     }
 
-    @Test
-    void sendEmail_ShouldReturnSuccessResponse() {
-        // Arrange
+    private ContactRequestDTO buildRequest() {
         ContactRequestDTO request = new ContactRequestDTO();
         request.setName("John Doe");
         request.setEmail("john@example.com");
         request.setMessage("Hello!");
-
-        // Act
-        ContactResponseDTO response = emailService.sendEmail(request);
-
-        // Assert
-        assertNotNull(response);
-        assertEquals("Mail Sent Successfully.", response.getMessage());
-
-        // Verify that JavaMailSender.send() was called
-        verify(javaMailSender, times(1)).send(any(SimpleMailMessage.class));
+        return request;
     }
 
     @Test
-    void sendEmail_ShouldThrowEmailSendException_WhenMailSenderFails() {
+    void sendEmail_shouldSendSuccessfully_onFirstAttempt() {
         // Arrange
-        ContactRequestDTO request = new ContactRequestDTO();
-        request.setName("John Doe");
-        request.setEmail("john@example.com");
-        request.setMessage("Hello!");
+        ContactRequestDTO request = buildRequest();
 
-        doThrow(new RuntimeException("SMTP server down"))
-                .when(javaMailSender).send(any(SimpleMailMessage.class));
+        // Act
+        emailService.sendEmail(request);
 
-        // Act & Assert
-        EmailSendException exception = assertThrows(EmailSendException.class, () -> {
-            emailService.sendEmail(request);
-        });
+        // Assert
+        verify(javaMailSender, times(1))
+                .send(any(SimpleMailMessage.class));
+    }
 
-        assertEquals("Failed to send email", exception.getMessage());
+    @Test
+    void sendEmail_shouldRetryAndEventuallySucceed() {
+        // Arrange
+        ContactRequestDTO request = buildRequest();
+
+        doThrow(new RuntimeException("SMTP down"))
+                .doThrow(new RuntimeException("Still down"))
+                .doNothing()
+                .when(javaMailSender)
+                .send(any(SimpleMailMessage.class));
+
+        // Act
+        emailService.sendEmail(request);
+
+        // Assert
+        verify(javaMailSender, times(3))
+                .send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    void sendEmail_shouldRetryAndGiveUp_afterMaxAttempts() {
+        // Arrange
+        ContactRequestDTO request = buildRequest();
+
+        doThrow(new RuntimeException("SMTP down"))
+                .when(javaMailSender)
+                .send(any(SimpleMailMessage.class));
+
+        // Act + Assert
+        assertDoesNotThrow(() -> emailService.sendEmail(request));
+
+        verify(javaMailSender, times(3))
+                .send(any(SimpleMailMessage.class));
     }
 }
